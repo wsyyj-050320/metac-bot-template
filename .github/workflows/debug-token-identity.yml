@@ -16,27 +16,20 @@ jobs:
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
         run: |
           python - <<'PY'
-          import os, urllib.request, json
+          import os, urllib.request, urllib.error, json
           tok = os.environ["METACULUS_TOKEN"]
           UA = {"Authorization": "Token " + tok,
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
                 "Accept": "application/json"}
-          req = urllib.request.Request(
-              "https://www.metaculus.com/api/auth/me/",
-              headers=UA,
-          )
-          d = json.load(urllib.request.urlopen(req, timeout=30))
-          keep = {k: d.get(k) for k in ("id", "username", "is_bot", "user_type", "date_joined") if k in d}
-          print("ACCOUNT:", json.dumps(keep))
-          # list my forecasting bots
-          for ep in ("/users/me/", "/users/me/bots/"):
+          for ep in ("/users/me/", "/users/me/bots/", "/auth/me/", "/me/",
+                     "/questions/?tournament=33121&limit=3&status=open"):
+              url = "https://www.metaculus.com/api" + ep
               try:
-                  r2 = urllib.request.Request(
-                      "https://www.metaculus.com" + ep,
-                      headers=UA,
-                  )
-                  d2 = json.load(urllib.request.urlopen(r2, timeout=30))
-                  print("BOTS", ep, ":", json.dumps(d2)[:1500])
+                  r = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30)
+                  body = r.read().decode("utf-8", "replace")
+                  print("OK", ep, "->", body[:1200].replace("\n", " "))
+              except urllib.error.HTTPError as e:
+                  print("HTTP", e.code, ep, "->", e.read()[:200].decode("utf-8", "replace").replace("\n", " "))
               except Exception as e:
-                  print("BOTS", ep, "->", type(e).__name__, getattr(e, "code", ""))
+                  print("ERR", ep, "->", type(e).__name__, str(e)[:120])
           PY
