@@ -16,20 +16,33 @@ jobs:
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
         run: |
           python - <<'PY'
-          import os, urllib.request, urllib.error, json
+          import os, urllib.request, urllib.error, urllib.parse, json
           tok = os.environ["METACULUS_TOKEN"]
           UA = {"Authorization": "Token " + tok,
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
                 "Accept": "application/json"}
-          for ep in ("/users/me/", "/users/me/bots/", "/auth/me/", "/me/",
-                     "/questions/?tournament=33121&limit=3&status=open"):
+          def get(ep, params=None):
               url = "https://www.metaculus.com/api" + ep
+              if params: url += "?" + urllib.parse.urlencode(params)
               try:
-                  r = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30)
-                  body = r.read().decode("utf-8", "replace")
-                  print("OK", ep, "->", body[:1200].replace("\n", " "))
+                  r = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=40)
+                  return r.status, json.loads(r.read().decode("utf-8","replace"))
               except urllib.error.HTTPError as e:
-                  print("HTTP", e.code, ep, "->", e.read()[:200].decode("utf-8", "replace").replace("\n", " "))
+                  return e.code, e.read()[:300].decode("utf-8","replace")
               except Exception as e:
-                  print("ERR", ep, "->", type(e).__name__, str(e)[:120])
+                  return None, f"{type(e).__name__}: {e}"
+          for label, params in [
+              ("posts t33121 open", {"limit":5,"statuses":"open","tournaments":"33121","with_cp":"true","order_by":"-published_time"}),
+              ("posts t33121 ANY", {"limit":5,"tournaments":"33121","with_cp":"true"}),
+              ("posts fall-slug ANY", {"limit":5,"tournaments":"fall-futureeval-2026","with_cp":"true"}),
+              ("posts no-tourn open", {"limit":3,"statuses":"open","with_cp":"true"}),
+          ]:
+              code, body = get("/posts/", params)
+              if isinstance(body, dict):
+                  print(label, "-> HTTP", code, "count:", body.get("count"), "results:", len(body.get("results", [])))
+                  for r in body.get("results", [])[:3]:
+                      q = r.get("question") or {}
+                      print("   -", r.get("id"), "|", (q.get("title") or r.get("title") or "?")[:70], "| status:", q.get("status"))
+              else:
+                  print(label, "-> HTTP", code, str(body)[:150])
           PY
