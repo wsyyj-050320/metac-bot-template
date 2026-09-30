@@ -28,8 +28,8 @@ jobs:
           d = json.load(urllib.request.urlopen(req, timeout=30))
           keep = {k: d.get(k) for k in ("id", "username", "is_bot", "user_type", "date_joined") if k in d}
           print("ACCOUNT:", json.dumps(keep))
-          # list my forecasting bots if endpoint exists
-          for ep in ("/api/bots/", "/api/bots/mine/", "/api/forecast_bots/"):
+          # list my forecasting bots
+          for ep in ("/users/me/", "/users/me/bots/"):
               try:
                   r2 = urllib.request.Request(
                       "https://www.metaculus.com" + ep,
