@@ -1,0 +1,39 @@
+name: Debug - identify token account (one-off, delete after use)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  whoami:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Who am I
+        env:
+          METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }}
+        run: |
+          python - <<'PY'
+          import os, urllib.request, json
+          tok = os.environ["METACULUS_TOKEN"]
+          req = urllib.request.Request(
+              "https://www.metaculus.com/api/auth/me/",
+              headers={"Authorization": "Token " + tok},
+          )
+          d = json.load(urllib.request.urlopen(req, timeout=30))
+          keep = {k: d.get(k) for k in ("id", "username", "is_bot", "user_type", "date_joined") if k in d}
+          print("ACCOUNT:", json.dumps(keep))
+          # list my forecasting bots if endpoint exists
+          for ep in ("/api/bots/", "/api/bots/mine/", "/api/forecast_bots/"):
+              try:
+                  r2 = urllib.request.Request(
+                      "https://www.metaculus.com" + ep,
+                      headers={"Authorization": "Token " + tok},
+                  )
+                  d2 = json.load(urllib.request.urlopen(r2, timeout=30))
+                  print("BOTS", ep, ":", json.dumps(d2)[:1500])
+              except Exception as e:
+                  print("BOTS", ep, "->", type(e).__name__, getattr(e, "code", ""))
+          PY
